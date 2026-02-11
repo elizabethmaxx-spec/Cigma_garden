@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CIGMA Garden: Final Fix</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        body { margin: 0; background: #0a0f0a; color: white; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
+        #ui-top { width: 100%; padding: 10px; display: flex; justify-content: space-around; align-items: center; font-weight: bold; background: #152015; border-bottom: 3px solid #4cd964; position: sticky; top: 0; z-index: 2000; }
+        
+        #weather-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1500; transition: 1s; }
+        .container { width: 100%; max-width: 500px; margin: auto; padding: 10px; height: 92vh; overflow-y: auto; }
+
+        #garden-area { position: relative; width: 100%; background: #2b1d10; border-radius: 20px; border: 4px solid #3e2723; padding: 15px; min-height: 380px; }
+        #garden-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; position: relative; z-index: 10; }
+        
+        .plot { aspect-ratio: 1/1; background: #5d4037; border-radius: 12px; border: 3px solid #3e2723; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 32px; cursor: pointer; position: relative; }
+        .plot.watered { border-color: #2196f3; box-shadow: inset 0 0 15px rgba(33,150,243,0.5); }
+        .plot.mutated { border-color: #ff00ff; box-shadow: 0 0 15px #ff00ff; }
+
+        .grow-timer { position: absolute; top: 2px; font-size: 11px; background: rgba(0,0,0,0.8); padding: 1px 5px; border-radius: 4px; color: #4cd964; }
+        .mut-name { position: absolute; bottom: 2px; font-size: 9px; color: #ffeb3b; font-weight: bold; text-align: center; width: 100%; }
+
+        .live-pet { position: absolute; font-size: 38px; z-index: 25; transition: all 2.5s ease-in-out; pointer-events: none; }
+
+        #pet-profile { position: fixed; right: -300px; top: 0; width: 280px; height: 100%; background: #0d140d; z-index: 3000; transition: 0.4s; padding: 25px; border-left: 4px solid #4cd964; }
+        #pet-profile.open { right: 0; }
+
+        .section { background: #161616; padding: 12px; border-radius: 18px; margin-top: 15px; border: 1px solid #2a2a2a; }
+        .inv-grid { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; min-height: 90px; }
+        .inv-slot { min-width: 70px; height: 70px; background: #222; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 2px solid #333; font-size: 28px; cursor: pointer; position: relative; }
+        .inv-slot.selected { border-color: #4cd964; background: #1a2a1a; }
+
+        .market-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+        .card { background: #1e2e1e; padding: 10px; border-radius: 12px; text-align: center; border: 1px solid #333; font-size: 13px; }
+        .btn { width: 100%; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 6px; }
+        .btn-buy { background: #4cd964; color: #000; }
+        .btn-sell { background: #ff9800; color: #000; }
+    </style>
+</head>
+<body>
+
+    <div id="weather-overlay"></div>
+
+    <div id="ui-top">
+        <div id="w-ui" style="background:rgba(0,0,0,0.5); padding:5px; border-radius:10px;">🌤️ Ясно</div>
+        <div>💰 <span id="coins">500</span></div>
+        <div>💧 <span id="water">25</span></div>
+    </div>
+
+    <div id="pet-profile">
+        <div onclick="closeProfile()" style="float:right; cursor:pointer;">✕</div>
+        <div id="p-icon" style="font-size:70px; text-align:center; margin-top:40px;"></div>
+        <h2 id="p-name" style="text-align:center;"></h2>
+        <p id="p-desc" style="font-size:14px; color:#ccc;"></p>
+        <button class="btn" style="background:#4cd964" onclick="applyPet()">ВЫПУСТИТЬ</button>
+    </div>
+
+    <div class="container">
+        <div id="garden-area">
+            <div id="garden-grid">
+                <script>for(let i=0; i<9; i++) document.write(`<div class="plot" id="plot-${i}" onclick="interactPlot(${i})"></div>`);</script>
+            </div>
+        </div>
+
+        <div class="section">
+            <strong>ИНВЕНТАРЬ (Петы: <span id="pet-count">0</span>/3)</strong>
+            <div id="inv-items" class="inv-grid"></div>
+        </div>
+
+        <div class="section" style="border-color: #2196f3;">
+            <strong style="color:#2196f3">GEAR SHOP</strong>
+            <div class="market-grid">
+                <div class="card">💧 Вода (10 шт)<br>40💰 <button class="btn btn-buy" onclick="buyGear('water', 40, 10)">КУПИТЬ</button></div>
+                <div class="card">🧬 Удобрение<br>100💰 <button class="btn btn-buy" onclick="buyGear('fert', 100, 0)">КУПИТЬ</button></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <strong>СТОК СЕМЯН (<span id="shop-timer">120</span>с)</strong>
+            <div class="market-grid" id="seed-stock-display"></div>
+            <button class="btn" style="background:#8a2be2; color:white" onclick="buyEgg()">КУПИТЬ ЯЙЦО (150💰)</button>
+        </div>
+
+        <div class="section">
+            <strong>РЫНОК</strong>
+            <div id="sell-market" class="market-grid"></div>
+        </div>
+    </div>
+
+<script>
+    let coins = 500, water = 25, selectedIdx = null;
+    let plots = Array(9).fill(null);
+    let inventory = [], activePets = [], currentStock = [];
+    let currentWeather = { name: 'Ясно', id: 'clear', mult: 1, color: 'transparent', icon: '🌤️' };
+
+    const SEEDS = [
+        { icon: '🥕', name: 'Морковь', price: 10, sell: 25, time: 10 },
+        { icon: '🎃', name: 'Тыква', price: 30, sell: 85, time: 25 },
+        { icon: '🌵', name: 'Кактус', price: 70, sell: 210, time: 50 },
+        { icon: '🌸', name: 'Candy', price: 400, sell: 1500, time: 100 }
+    ];
+
+    const PETS = {
+        '🐱': { name: 'Кот', desc: 'Дает +25💰 каждые 20с', effect: 'money' },
+        '🦉': { name: 'Сова', desc: 'Дает +4💧 каждые 20с', effect: 'water' },
+        '🦝': { name: 'Енот', desc: 'Крадет фрукты каждые 40с', effect: 'fruit' },
+        '🐝': { name: 'Стрекоза', desc: 'Золотая мутация урожая (х1.75)', effect: 'mutate' }
+    };
+
+    const WEATHER = [
+        { name: 'Дождь', id: 'rain', mult: 1.2, color: 'rgba(0,100,255,0.15)', icon: '🌧️', mut: 'Сочный' },
+        { name: 'Снег', id: 'snow', mult: 1.4, color: 'rgba(255,255,255,0.15)', icon: '❄️', mut: 'Ледяной' },
+        { name: 'Буря', id: 'sand', mult: 1.6, color: 'rgba(210,180,140,0.25)', icon: '🏜️', mut: 'Пустынный' },
+        { name: 'Радиация', id: 'nuke', mult: 2.2, color: 'rgba(50,255,50,0.15)', icon: '☢️', mut: 'Мутант' },
+        { name: 'Сияние', id: 'gold', mult: 3.0, color: 'rgba(255,215,0,0.2)', icon: '✨', mut: 'Святой' }
+    ];
+
+    function updateWeather() {
+        currentWeather = (Math.random() < 0.25) ? WEATHER[Math.floor(Math.random()*WEATHER.length)] : { name: 'Ясно', id: 'clear', mult: 1, color: 'transparent', icon: '🌤️' };
+        document.getElementById('w-ui').innerText = currentWeather.icon + ' ' + currentWeather.name;
+        document.getElementById('weather-overlay').style.background = currentWeather.color;
+    }
+    setInterval(updateWeather, 30000);
+
+    function interactPlot(i) {
+        const p = plots[i];
+        const sel = inventory[selectedIdx];
+
+        // 1. Посадка (если грядка пуста и выбраны семена)
+        if(!p && sel && sel.type === 'seed') {
+            let mut = (currentWeather.id !== 'clear' && Math.random() < 0.3) ? currentWeather : null;
+            plots[i] = { ...sel, timeLeft: sel.time, stage: 0, watered: false, weatherMut: mut, isGolden: false };
+            inventory.splice(selectedIdx, 1);
+            selectedIdx = null; closeProfile(); updateUI();
+        } 
+        // 2. Полив
+        else if(p && !p.watered && water > 0 && p.stage < 2) {
+            water--; p.watered = true; updateUI();
+        } 
+        // 3. СБОР (БАГ ИСПРАВЛЕН ТУТ)
+        else if(p && p.stage === 2) {
+            let price = p.sell;
+            if(p.weatherMut) price = Math.floor(price * p.weatherMut.mult);
+            if(p.isGolden) price = Math.floor(price * 1.75);
+
+            inventory.push({ 
+                icon: p.icon, 
+                type: 'fruit', 
+                sell: price, 
+                label: p.isGolden ? 'Золотой' : (p.weatherMut ? p.weatherMut.mut : '') 
+            });
+            
+            plots[i] = null; // ГАРАНТИРОВАННОЕ ОЧИЩЕНИЕ ДАННЫХ
+            const el = document.getElementById(`plot-${i}`);
+            el.innerHTML = ''; // ОЧИЩЕНИЕ ВИЗУАЛА
+            el.className = 'plot'; // СБРОС СТИЛЕЙ
+            
+            updateUI();
+        }
+    }
+
+    // Движок роста
+    setInterval(() => {
+        plots.forEach((p, i) => {
+            if(!p || p.stage >= 2) return;
+            p.timeLeft -= (p.watered ? 2 : 1) / 10;
+            if(p.timeLeft <= p.time * 0.5 && p.stage === 0) p.stage = 1;
+            if(p.timeLeft <= 0) { p.timeLeft = 0; p.stage = 2; }
+            
+            // Отрисовка только если грядка не пуста
+            const el = document.getElementById(`plot-${i}`);
+            el.className = 'plot' + (p.watered ? ' watered' : '') + ((p.weatherMut || p.isGolden) ? ' mutated' : '');
+            let visual = p.stage === 0 ? '🌱' : (p.stage === 1 ? '🌿' : p.icon);
+            let timer = p.stage < 2 ? `<div class="grow-timer">${Math.ceil(p.timeLeft)}s</div>` : '';
+            let label = p.isGolden ? 'ЗОЛОТОЙ' : (p.weatherMut ? p.weatherMut.mut : '');
+            el.innerHTML = timer + visual + (label ? `<div class="mut-name">${label}</div>` : '');
+        });
+    }, 100);
+
+    function applyPet() {
+        if(activePets.length >= 3) return;
+        const pet = inventory[selectedIdx];
+        if(pet && pet.type === 'pet') {
+            const id = Date.now();
+            const sprite = document.createElement('div');
+            sprite.className = 'live-pet'; sprite.id = 'p-' + id; sprite.innerText = pet.icon;
+            document.getElementById('garden-area').appendChild(sprite);
+            activePets.push({ id, effect: pet.effect });
+            
+            const move = () => { const s = document.getElementById('p-'+id); if(s){ s.style.left=Math.random()*80+'%'; s.style.top=Math.random()*70+'%'; }};
+            move(); setInterval(move, 4000);
+            
+            setInterval(() => {
+                if(pet.effect === 'money') coins += 25;
+                if(pet.effect === 'water') water += 4;
+                if(pet.effect === 'fruit') inventory.push({icon:'🍎', type:'fruit', sell:45, label:'Украдено'});
+                if(pet.effect === 'mutate') {
+                    const ready = plots.filter(p => p && p.stage === 2 && !p.isGolden);
+                    if(ready.length > 0) ready[Math.floor(Math.random()*ready.length)].isGolden = true;
+                }
+                updateUI();
+            }, 25000);
+
+            inventory.splice(selectedIdx, 1); selectedIdx = null; closeProfile(); updateUI();
+        }
+    }
+
+    function updateUI() {
+        document.getElementById('coins').innerText = coins;
+        document.getElementById('water').innerText = water;
+        document.getElementById('pet-count').innerText = activePets.length;
+        
+        const grid = document.getElementById('inv-items'); grid.innerHTML = '';
+        inventory.forEach((item, i) => {
+            const slot = document.createElement('div');
+            slot.className = 'inv-slot' + (selectedIdx === i ? ' selected' : '');
+            slot.innerHTML = item.icon + (item.label ? '✨' : '');
+            slot.onclick = () => {
+                selectedIdx = i;
+                if(item.type === 'pet') openProfile(item);
+                else { closeProfile(); updateUI(); }
+            };
+            grid.appendChild(slot);
+        });
+
+        const sellBox = document.getElementById('sell-market'); sellBox.innerHTML = '';
+        inventory.filter(it => it.type === 'fruit').forEach(it => {
+            sellBox.innerHTML += `<div class="card">${it.icon} ${it.label || ''}<br>+${it.sell}💰<br><button class="btn btn-sell" onclick="sellOne(${inventory.indexOf(it)})">ПРОДАТЬ</button></div>`;
+        });
+    }
+
+    function sellOne(idx) { coins += inventory[idx].sell; inventory.splice(idx, 1); updateUI(); }
+    function buyGear(t, c, a) { if(coins >= c) { coins -= c; if(t==='water') water += a; updateUI(); } }
+    function openProfile(p) { 
+        document.getElementById('p-icon').innerText = p.icon; 
+        document.getElementById('p-name').innerText = p.name; 
+        document.getElementById('p-desc').innerText = p.desc;
+        document.getElementById('pet-profile').classList.add('open'); 
+    }
+    function closeProfile() { document.getElementById('pet-profile').classList.remove('open'); }
+    function buyEgg() {
+        if(coins >= 150) {
+            coins -= 150;
+            const k = Object.keys(PETS); const icon = k[Math.floor(Math.random()*k.length)];
+            inventory.push({ icon, type: 'pet', ...PETS[icon] }); updateUI();
+        }
+    }
+
+    function updateStock() {
+        const d = document.getElementById('seed-stock-display'); d.innerHTML = ''; currentStock = [];
+        for(let i=0; i<2; i++) {
+            const s = SEEDS[Math.floor(Math.random()*SEEDS.length)]; currentStock.push(s);
+            d.innerHTML += `<div class="card">${s.icon} ${s.name}<br>${s.price}💰<button class="btn btn-buy" onclick="buyFromStock(${i})">КУПИТЬ</button></div>`;
+        }
+    }
+    function buyFromStock(i) { const s = currentStock[i]; if(coins >= s.price) { coins -= s.price; inventory.push({...s, type:'seed'}); updateUI(); } }
+
+    let shopSec = 120;
+    setInterval(() => { shopSec--; document.getElementById('shop-timer').innerText = shopSec; if(shopSec <= 0) { shopSec = 120; updateStock(); } }, 1000);
+
+    updateStock(); updateUI();
+</script>
+</body>
+</html>
