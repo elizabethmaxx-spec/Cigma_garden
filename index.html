@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CIGMA Garden: Aura Fix</title>
+    <title>CIGMA Garden: Shovel Update</title>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
         body { margin: 0; background: #0a0f0a; color: white; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
@@ -20,13 +20,11 @@
         #garden-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; position: relative; z-index: 10; }
         
         .plot { aspect-ratio: 1/1; background: #5d4037; border-radius: 12px; border: 3px solid #3e2723; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 32px; cursor: pointer; position: relative; transition: 0.3s; }
-        /* Те самые ауры */
         .plot.watered { border-color: #2196f3; box-shadow: inset 0 0 15px rgba(33,150,243,0.5); }
         .plot.mutated { border-color: #ff00ff; box-shadow: 0 0 15px #ff00ff; }
 
         .grow-timer { position: absolute; top: 2px; font-size: 11px; background: rgba(0,0,0,0.8); padding: 1px 5px; border-radius: 4px; color: #4cd964; }
         .mut-name { position: absolute; bottom: 2px; font-size: 9px; color: #ffeb3b; font-weight: bold; text-align: center; width: 100%; text-shadow: 1px 1px #000; }
-
         .live-pet { position: absolute; font-size: 38px; z-index: 25; transition: all 2.5s ease-in-out; cursor: pointer; pointer-events: auto; }
 
         #pet-profile { position: fixed; right: -300px; top: 0; width: 280px; height: 100%; background: #0d140d; z-index: 3000; transition: 0.4s; padding: 25px; border-left: 4px solid #4cd964; }
@@ -88,7 +86,7 @@
             <strong style="color:#2196f3">GEAR SHOP</strong>
             <div class="market-grid">
                 <div class="card">💧 Вода (10 шт)<br>40💰 <button class="btn btn-buy" onclick="buyGear('water', 40, 10)">КУПИТЬ</button></div>
-                <div class="card">🧬 Удобрение<br>100💰 <button class="btn btn-buy" onclick="buyGear('fert', 100, 0)">КУПИТЬ</button></div>
+                <div class="card">🧹 Лопата (Беск.)<br>50💰 <button class="btn btn-buy" onclick="buyGear('shovel', 50, 1)">КУПИТЬ</button></div>
             </div>
         </div>
 
@@ -178,6 +176,17 @@
         const sel = inventory[selectedIdx];
         const el = document.getElementById(`plot-${i}`);
 
+        // Использование лопаты
+        if (sel && sel.type === 'tool' && sel.name === 'Лопата') {
+            if (p) {
+                plots[i] = null;
+                el.innerHTML = '';
+                el.className = 'plot';
+                updateUI();
+                return;
+            }
+        }
+
         if(!p && sel && sel.type === 'seed') {
             let mut = (currentWeather.id !== 'clear' && Math.random() < 0.4) ? currentWeather : null;
             plots[i] = { ...sel, timeLeft: sel.time, stage: 0, watered: false, weatherMut: mut, isGolden: false };
@@ -190,21 +199,9 @@
             let finalPrice = p.sell;
             if(p.weatherMut) finalPrice = Math.floor(finalPrice * p.weatherMut.mult);
             if(p.isGolden) finalPrice = Math.floor(finalPrice * 1.75);
-
-            inventory.push({ 
-                icon: (p.name === 'Яблоня' ? '🍎' : p.icon), 
-                type: 'fruit', 
-                sell: finalPrice, 
-                label: p.isGolden ? 'Золотой' : (p.weatherMut ? p.weatherMut.mut : '') 
-            });
-
-            if (p.isPermanent) { 
-                p.timeLeft = p.time; p.stage = 0; p.watered = false; p.isGolden = false; p.weatherMut = null; 
-            } else { 
-                plots[i] = null; 
-                el.innerHTML = ''; 
-                el.className = 'plot'; // ФИКС: Сбрасываем все ауры при удалении растения
-            }
+            inventory.push({ icon: (p.name === 'Яблоня' ? '🍎' : p.icon), type: 'fruit', sell: finalPrice, label: p.isGolden ? 'Золотой' : (p.weatherMut ? p.weatherMut.mut : '') });
+            if (p.isPermanent) { p.timeLeft = p.time; p.stage = 0; p.watered = false; p.isGolden = false; p.weatherMut = null; } 
+            else { plots[i] = null; el.innerHTML = ''; el.className = 'plot'; }
             updateUI();
         }
     }
@@ -217,12 +214,7 @@
             if(p.timeLeft <= p.time * 0.5 && p.stage === 0) p.stage = 1;
             if(p.timeLeft <= 0) { p.timeLeft = 0; p.stage = 2; }
             const el = document.getElementById(`plot-${i}`);
-            
-            // ОБНОВЛЕНИЕ КЛАССОВ (АУР)
-            el.className = 'plot' + 
-                (p.watered ? ' watered' : '') + 
-                ((p.weatherMut || p.isGolden) ? ' mutated' : '');
-
+            el.className = 'plot' + (p.watered ? ' watered' : '') + ((p.weatherMut || p.isGolden) ? ' mutated' : '');
             let visual = p.stage === 0 ? '🌱' : (p.stage === 1 ? '🌿' : p.icon);
             let lbl = p.isGolden ? 'ЗОЛОТОЙ' : (p.weatherMut ? p.weatherMut.mut : '');
             el.innerHTML = (p.stage < 2 ? `<div class="grow-timer">${Math.ceil(p.timeLeft)}s</div>` : '') + visual + (lbl ? `<div class="mut-name">${lbl}</div>` : '');
@@ -290,11 +282,24 @@
         });
     }
 
+    function buyGear(t, c, a) { 
+        if(coins >= c) { 
+            if(t === 'shovel') {
+                if(inventory.find(it => it.name === 'Лопата')) return alert("Лопата уже есть!");
+                inventory.push({ icon: '🧹', type: 'tool', name: 'Лопата' });
+            } else if(t==='water') {
+                water += a;
+            }
+            coins -= c; 
+            updateUI(); 
+        } 
+    }
+
     function sellOne(idx) { coins += inventory[idx].sell; inventory.splice(idx, 1); updateUI(); }
     function openProfile(p) { document.getElementById('p-icon').innerText = p.icon; document.getElementById('p-name').innerText = p.name; document.getElementById('p-desc').innerText = p.desc; document.getElementById('pet-profile').classList.add('open'); }
     function closeProfile() { document.getElementById('pet-profile').classList.remove('open'); }
     function buyEgg() { if(coins >= 150) { coins -= 150; const k = Object.keys(PETS); const icon = k[Math.floor(Math.random()*k.length)]; inventory.push({ icon, type: 'pet', ...PETS[icon] }); updateUI(); } }
-    function buyGear(t, c, a) { if(coins >= c) { coins -= c; if(t==='water') water += a; updateUI(); } }
+    
     function updateStock() {
         const d = document.getElementById('seed-stock-display'); d.innerHTML = ''; currentStock = [];
         for(let i=0; i<2; i++) {
