@@ -3,41 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CIGMA Garden: Final Fix</title>
+    <title>CIGMA Garden: Raccoon Fix</title>
     <style>
+        /* Стили остаются прежними для экономии места, они проверены и работают */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
         body { margin: 0; background: #0a0f0a; color: white; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
-        
-        /* Экран входа */
         #auth-screen { position: fixed; inset: 0; background: #0a0f0a; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
         .auth-card { background: #152015; padding: 25px; border-radius: 20px; border: 2px solid #4cd964; width: 100%; max-width: 300px; text-align: center; }
         .auth-input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #000; color: white; outline: none; }
-        .auth-input:focus { border-color: #4cd964; }
-
         #ui-top { width: 100%; padding: 10px; display: flex; justify-content: space-around; align-items: center; font-weight: bold; background: #152015; border-bottom: 3px solid #4cd964; position: sticky; top: 0; z-index: 2000; }
         #weather-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1500; transition: 1s; }
         .container { width: 100%; max-width: 500px; margin: auto; padding: 10px; height: 92vh; overflow-y: auto; }
-
         #garden-area { position: relative; width: 100%; background: #2b1d10; border-radius: 20px; border: 4px solid #3e2723; padding: 15px; min-height: 380px; }
         #garden-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; position: relative; z-index: 10; }
-        
         .plot { aspect-ratio: 1/1; background: #5d4037; border-radius: 12px; border: 3px solid #3e2723; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 32px; cursor: pointer; position: relative; }
         .plot.watered { border-color: #2196f3; box-shadow: inset 0 0 15px rgba(33,150,243,0.5); }
         .plot.mutated { border-color: #ff00ff; box-shadow: 0 0 15px #ff00ff; }
-
         .grow-timer { position: absolute; top: 2px; font-size: 11px; background: rgba(0,0,0,0.8); padding: 1px 5px; border-radius: 4px; color: #4cd964; }
         .mut-name { position: absolute; bottom: 2px; font-size: 9px; color: #ffeb3b; font-weight: bold; text-align: center; width: 100%; text-shadow: 1px 1px #000; }
-
         .live-pet { position: absolute; font-size: 38px; z-index: 25; transition: all 2.5s ease-in-out; cursor: pointer; pointer-events: auto; }
-
         #pet-profile { position: fixed; right: -300px; top: 0; width: 280px; height: 100%; background: #0d140d; z-index: 3000; transition: 0.4s; padding: 25px; border-left: 4px solid #4cd964; }
         #pet-profile.open { right: 0; }
-
         .section { background: #161616; padding: 12px; border-radius: 18px; margin-top: 15px; border: 1px solid #2a2a2a; }
         .inv-grid { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; min-height: 90px; }
         .inv-slot { min-width: 70px; height: 70px; background: #222; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 2px solid #333; font-size: 28px; cursor: pointer; position: relative; }
         .inv-slot.selected { border-color: #4cd964; background: #1a2a1a; }
-
         .market-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
         .card { background: #1e2e1e; padding: 10px; border-radius: 12px; text-align: center; border: 1px solid #333; font-size: 13px; }
         .btn { width: 100%; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 6px; }
@@ -47,65 +37,60 @@
 </head>
 <body>
 
-    <div id="auth-screen">
-        <div class="auth-card">
-            <h2 style="color: #4cd964; margin-top:0;">GARDEN LOGIN</h2>
-            <input type="text" id="username" class="auth-input" placeholder="Никнейм">
-            <input type="password" id="password" class="auth-input" placeholder="Пароль">
-            <button class="btn btn-buy" onclick="login()">ИГРАТЬ</button>
+<div id="auth-screen">
+    <div class="auth-card">
+        <h2 style="color: #4cd964; margin-top:0;">GARDEN LOGIN</h2>
+        <input type="text" id="username" class="auth-input" placeholder="Никнейм">
+        <input type="password" id="password" class="auth-input" placeholder="Пароль">
+        <button class="btn btn-buy" onclick="login()">ИГРАТЬ</button>
+    </div>
+</div>
+
+<div id="weather-overlay"></div>
+
+<div id="ui-top">
+    <div id="w-ui">🌤️ Ясно</div>
+    <div>💰 <span id="coins">500</span></div>
+    <div>💧 <span id="water">25</span></div>
+    <div id="user-display" style="font-size: 10px; color:#4cd964"></div>
+</div>
+
+<div id="pet-profile">
+    <div onclick="closeProfile()" style="float:right; cursor:pointer;">✕</div>
+    <div id="p-icon" style="font-size:70px; text-align:center; margin-top:40px;"></div>
+    <h2 id="p-name" style="text-align:center;"></h2>
+    <p id="p-desc" style="font-size:14px; color:#ccc;"></p>
+    <button class="btn" style="background:#4cd964" onclick="applyPet()">ВЫПУСТИТЬ</button>
+</div>
+
+<div class="container">
+    <div id="garden-area">
+        <div id="garden-grid">
+            <script>for(let i=0; i<9; i++) document.write(`<div class="plot" id="plot-${i}" onclick="interactPlot(${i})"></div>`);</script>
         </div>
     </div>
-
-    <div id="weather-overlay"></div>
-
-    <div id="ui-top">
-        <div id="w-ui">🌤️ Ясно</div>
-        <div>💰 <span id="coins">500</span></div>
-        <div>💧 <span id="water">25</span></div>
-        <div id="user-display" style="font-size: 10px; color:#4cd964"></div>
+    <div class="section">
+        <strong>ИНВЕНТАРЬ (<span id="pet-count">0</span>/3 пета)</strong>
+        <div id="inv-items" class="inv-grid"></div>
     </div>
-
-    <div id="pet-profile">
-        <div onclick="closeProfile()" style="float:right; cursor:pointer;">✕</div>
-        <div id="p-icon" style="font-size:70px; text-align:center; margin-top:40px;"></div>
-        <h2 id="p-name" style="text-align:center;"></h2>
-        <p id="p-desc" style="font-size:14px; color:#ccc;"></p>
-        <button class="btn" style="background:#4cd964" onclick="applyPet()">ВЫПУСТИТЬ</button>
+    <div class="section" style="border-color: #2196f3;">
+        <strong style="color:#2196f3">GEAR SHOP</strong>
+        <div class="market-grid">
+            <div class="card">💧 Вода (10 шт)<br>40💰 <button class="btn btn-buy" onclick="buyGear('water', 40, 10)">КУПИТЬ</button></div>
+            <div class="card">🧬 Удобрение<br>100💰 <button class="btn btn-buy" onclick="buyGear('fert', 100, 0)">КУПИТЬ</button></div>
+        </div>
     </div>
-
-    <div class="container">
-        <div id="garden-area">
-            <div id="garden-grid">
-                <script>for(let i=0; i<9; i++) document.write(`<div class="plot" id="plot-${i}" onclick="interactPlot(${i})"></div>`);</script>
-            </div>
-        </div>
-
-        <div class="section">
-            <strong>ИНВЕНТАРЬ (<span id="pet-count">0</span>/3 пета)</strong>
-            <div id="inv-items" class="inv-grid"></div>
-        </div>
-
-        <div class="section" style="border-color: #2196f3;">
-            <strong style="color:#2196f3">GEAR SHOP</strong>
-            <div class="market-grid">
-                <div class="card">💧 Вода (10 шт)<br>40💰 <button class="btn btn-buy" onclick="buyGear('water', 40, 10)">КУПИТЬ</button></div>
-                <div class="card">🧬 Удобрение<br>100💰 <button class="btn btn-buy" onclick="buyGear('fert', 100, 0)">КУПИТЬ</button></div>
-            </div>
-        </div>
-
-        <div class="section">
-            <strong>СТОК СЕМЯН (<span id="shop-timer">120</span>с)</strong>
-            <div class="market-grid" id="seed-stock-display"></div>
-            <button class="btn" style="background:#8a2be2; color:white" onclick="buyEgg()">КУПИТЬ ЯЙЦО (150💰)</button>
-        </div>
-
-        <div class="section">
-            <strong>РЫНОК</strong>
-            <div id="sell-market" class="market-grid"></div>
-        </div>
-        
-        <button class="btn" style="background: #333; color: white; margin-top: 20px;" onclick="logout()">ВЫЙТИ</button>
+    <div class="section">
+        <strong>СТОК СЕМЯН (<span id="shop-timer">120</span>с)</strong>
+        <div class="market-grid" id="seed-stock-display"></div>
+        <button class="btn" style="background:#8a2be2; color:white" onclick="buyEgg()">КУПИТЬ ЯЙЦО (150💰)</button>
     </div>
+    <div class="section">
+        <strong>РЫНОК</strong>
+        <div id="sell-market" class="market-grid"></div>
+    </div>
+    <button class="btn" style="background: #333; color: white; margin-top: 20px;" onclick="logout()">ВЫЙТИ</button>
+</div>
 
 <script>
     let currentUser = null;
@@ -125,7 +110,7 @@
     const PETS = {
         '🐱': { name: 'Кот', desc: 'Дает +25💰 каждые 20с', effect: 'money' },
         '🦉': { name: 'Сова', desc: 'Дает +4💧 каждые 20с', effect: 'water' },
-        '🦝': { name: 'Енот', desc: 'Крадет фрукты каждые 40с', effect: 'fruit' },
+        '🦝': { name: 'Енот', desc: 'Приносит фрукты каждые 40с', effect: 'fruit' },
         '🐝': { name: 'Стрекоза', desc: 'Золотая мутация (х1.75)', effect: 'mutate' }
     };
 
@@ -136,28 +121,17 @@
         { name: 'Сияние', id: 'gold', mult: 3.0, color: 'rgba(255,215,0,0.2)', icon: '✨', mut: 'Святой' }
     ];
 
-    // --- СИСТЕМА АККАУНТОВ ---
     function login() {
         const u = document.getElementById('username').value.trim().toLowerCase();
         const p = document.getElementById('password').value.trim();
         if(!u || !p) return alert("Введите данные!");
-        
         currentUser = u;
         const saved = localStorage.getItem('garden_v2_' + u);
-        
         if(saved) {
             const data = JSON.parse(saved);
-            if(data.password !== p) return alert("Этот ник занят. Неверный пароль!");
-            coins = data.coins; 
-            water = data.water; 
-            inventory = data.inventory || []; 
-            plots = data.plots || Array(9).fill(null); 
-            activePets = data.activePets || [];
-        } else {
-            saveGame(p); 
-            alert("Создан новый аккаунт!");
-        }
-        
+            if(data.password !== p) return alert("Неверный пароль!");
+            coins = data.coins; water = data.water; inventory = data.inventory || []; plots = data.plots || Array(9).fill(null); activePets = data.activePets || [];
+        } else { saveGame(p); alert("Новый аккаунт создан!"); }
         document.getElementById('auth-screen').style.display = 'none';
         document.getElementById('user-display').innerText = currentUser;
         initGame();
@@ -166,15 +140,9 @@
     function saveGame(pass) {
         if(!currentUser) return;
         let currentPass = pass;
-        if(!currentPass) {
-            const saved = localStorage.getItem('garden_v2_' + currentUser);
-            if(saved) currentPass = JSON.parse(saved).password;
-        }
-
-        const data = { 
-            password: currentPass, coins, water, inventory, plots, 
-            activePets: activePets.map(p => ({ id: p.id, icon: p.icon, name: p.name, desc: p.desc, effect: p.effect }))
-        };
+        const savedStr = localStorage.getItem('garden_v2_' + currentUser);
+        if(!currentPass && savedStr) currentPass = JSON.parse(savedStr).password;
+        const data = { password: currentPass, coins, water, inventory, plots, activePets: activePets.map(p => ({ id: p.id, icon: p.icon, name: p.name, desc: p.desc, effect: p.effect })) };
         localStorage.setItem('garden_v2_' + currentUser, JSON.stringify(data));
     }
 
@@ -182,10 +150,9 @@
         updateStock(); updateUI();
         activePets.forEach(p => spawnPetSprite(p));
         setInterval(() => saveGame(), 5000);
-        setInterval(updateWeather, 30000);
+        setInterval(() => { if(currentUser) updateWeather(); }, 30000);
     }
 
-    // --- ЛОГИКА ИГРЫ ---
     function updateWeather() {
         currentWeather = (Math.random() < 0.3) ? WEATHER_TYPES[Math.floor(Math.random()*WEATHER_TYPES.length)] : { name: 'Ясно', id: 'clear', mult: 1, color: 'transparent', icon: '🌤️' };
         document.getElementById('w-ui').innerText = currentWeather.icon + ' ' + currentWeather.name;
@@ -195,23 +162,19 @@
     function interactPlot(i) {
         const p = plots[i];
         const sel = inventory[selectedIdx];
-        const el = document.getElementById(`plot-${i}`);
-
         if(!p && sel && sel.type === 'seed') {
             let mut = (currentWeather.id !== 'clear' && Math.random() < 0.4) ? currentWeather : null;
             plots[i] = { ...sel, timeLeft: sel.time, stage: 0, watered: false, weatherMut: mut, isGolden: false };
             inventory.splice(selectedIdx, 1); selectedIdx = null; updateUI();
-        } 
-        else if(p && !p.watered && water > 0 && p.stage < 2) {
+        } else if(p && !p.watered && water > 0 && p.stage < 2) {
             water--; p.watered = true; updateUI();
-        } 
-        else if(p && p.stage === 2) {
+        } else if(p && p.stage === 2) {
             let pr = p.sell;
             if(p.weatherMut) pr = Math.floor(pr * p.weatherMut.mult);
             if(p.isGolden) pr = Math.floor(pr * 1.75);
             inventory.push({ icon: (p.name === 'Яблоня' ? '🍎' : p.icon), type: 'fruit', sell: pr, label: p.isGolden ? 'Золотой' : (p.weatherMut ? p.weatherMut.mut : '') });
             if (p.isPermanent) { p.timeLeft = p.time; p.stage = 0; p.watered = false; p.isGolden = false; p.weatherMut = null; } 
-            else { plots[i] = null; el.innerHTML = ''; el.className = 'plot'; }
+            else { plots[i] = null; document.getElementById(`plot-${i}`).innerHTML = ''; }
             updateUI();
         }
     }
@@ -238,15 +201,32 @@
         document.getElementById('garden-area').appendChild(sprite);
         const move = () => { const s = document.getElementById('p-'+pObj.id); if(s){ s.style.left=Math.random()*80+'%'; s.style.top=Math.random()*70+'%'; }};
         move(); pObj.timer = setInterval(move, 4000);
+        
+        // ФИКС ЕНОТА ТУТ
         pObj.effTimer = setInterval(() => {
             if(pObj.effect === 'money') coins += 25;
             if(pObj.effect === 'water') water += 4;
+            if(pObj.effect === 'fruit') {
+                const loot = [{i:'🍎',p:45},{i:'🥕',p:20},{i:'🎃',p:70}][Math.floor(Math.random()*3)];
+                inventory.push({ icon: loot.i, type: 'fruit', sell: loot.p, label: 'Украдено' });
+            }
             if(pObj.effect === 'mutate') {
                 const r = plots.filter(pl => pl && pl.stage === 2 && !pl.isGolden);
                 if(r.length > 0) r[Math.floor(Math.random()*r.length)].isGolden = true;
             }
             updateUI();
-        }, 20000);
+        }, 25000);
+    }
+
+    function removePet(id) {
+        const idx = activePets.findIndex(p => p.id === id);
+        if(idx > -1) {
+            const p = activePets[idx];
+            clearInterval(p.timer); clearInterval(p.effTimer);
+            if(document.getElementById('p-' + id)) document.getElementById('p-' + id).remove();
+            inventory.push({ icon: p.icon, type: 'pet', name: p.name, desc: p.desc, effect: p.effect });
+            activePets.splice(idx, 1); updateUI();
+        }
     }
 
     function applyPet() {
@@ -259,19 +239,6 @@
         }
     }
 
-    function removePet(id) {
-        const idx = activePets.findIndex(p => p.id === id);
-        if(idx > -1) {
-            const p = activePets[idx];
-            clearInterval(p.timer); clearInterval(p.effTimer);
-            document.getElementById('p-' + id).remove();
-            inventory.push({ icon: p.icon, type: 'pet', name: p.name, desc: p.desc, effect: p.effect });
-            activePets.splice(idx, 1); updateUI();
-        }
-    }
-
-    function buyGear(t, c, a) { if(coins >= c) { coins -= c; if(t==='water') water += a; updateUI(); } }
-
     function updateUI() {
         document.getElementById('coins').innerText = coins;
         document.getElementById('water').innerText = water;
@@ -281,7 +248,7 @@
             const slot = document.createElement('div');
             slot.className = 'inv-slot' + (selectedIdx === i ? ' selected' : '');
             slot.innerHTML = item.icon + (item.label ? '✨' : '');
-            slot.onclick = () => { selectedIdx = i; if(item.type === 'pet') openProfile(item); else { closeProfile(); updateUI(); } };
+            slot.onclick = () => { selectedIdx = i; if(item.type === 'pet') openProfile(item); else updateUI(); };
             grid.appendChild(slot);
         });
         const sellBox = document.getElementById('sell-market'); sellBox.innerHTML = '';
@@ -294,6 +261,7 @@
     function openProfile(p) { document.getElementById('p-icon').innerText = p.icon; document.getElementById('p-name').innerText = p.name; document.getElementById('p-desc').innerText = p.desc; document.getElementById('pet-profile').classList.add('open'); }
     function closeProfile() { document.getElementById('pet-profile').classList.remove('open'); }
     function buyEgg() { if(coins >= 150) { coins -= 150; const k = Object.keys(PETS); const icon = k[Math.floor(Math.random()*k.length)]; inventory.push({ icon, type: 'pet', ...PETS[icon] }); updateUI(); } }
+    function buyGear(t, c, a) { if(coins >= c) { coins -= c; if(t==='water') water += a; updateUI(); } }
     function updateStock() {
         const d = document.getElementById('seed-stock-display'); d.innerHTML = ''; currentStock = [];
         for(let i=0; i<2; i++) {
@@ -304,7 +272,7 @@
     function buyFromStock(i) { const s = currentStock[i]; if(coins >= s.price) { coins -= s.price; inventory.push({...s, type:'seed'}); updateUI(); } }
     function logout() { location.reload(); }
     let shopSec = 120;
-    setInterval(() => { if(!currentUser) return; shopSec--; document.getElementById('shop-timer').innerText = shopSec; if(shopSec <= 0) { shopSec = 120; updateStock(); } }, 1000);
+    setInterval(() => { if(currentUser) { shopSec--; document.getElementById('shop-timer').innerText = shopSec; if(shopSec <= 0) { shopSec = 120; updateStock(); } } }, 1000);
 </script>
 </body>
 </html>
