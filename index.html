@@ -7,8 +7,14 @@
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
         body { margin: 0; background: #0a0f0a; color: white; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
-        #ui-top { width: 100%; padding: 10px; display: flex; justify-content: space-around; align-items: center; font-weight: bold; background: #152015; border-bottom: 3px solid #4cd964; position: sticky; top: 0; z-index: 2000; }
         
+        /* Экран входа */
+        #auth-screen { position: fixed; inset: 0; background: #0a0f0a; z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .auth-card { background: #152015; padding: 25px; border-radius: 20px; border: 2px solid #4cd964; width: 100%; max-width: 300px; text-align: center; }
+        .auth-input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #000; color: white; outline: none; }
+        .auth-input:focus { border-color: #4cd964; }
+
+        #ui-top { width: 100%; padding: 10px; display: flex; justify-content: space-around; align-items: center; font-weight: bold; background: #152015; border-bottom: 3px solid #4cd964; position: sticky; top: 0; z-index: 2000; }
         #weather-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1500; transition: 1s; }
         .container { width: 100%; max-width: 500px; margin: auto; padding: 10px; height: 92vh; overflow-y: auto; }
 
@@ -20,9 +26,9 @@
         .plot.mutated { border-color: #ff00ff; box-shadow: 0 0 15px #ff00ff; }
 
         .grow-timer { position: absolute; top: 2px; font-size: 11px; background: rgba(0,0,0,0.8); padding: 1px 5px; border-radius: 4px; color: #4cd964; }
-        .mut-name { position: absolute; bottom: 2px; font-size: 9px; color: #ffeb3b; font-weight: bold; text-align: center; width: 100%; }
+        .mut-name { position: absolute; bottom: 2px; font-size: 9px; color: #ffeb3b; font-weight: bold; text-align: center; width: 100%; text-shadow: 1px 1px #000; }
 
-        .live-pet { position: absolute; font-size: 38px; z-index: 25; transition: all 2.5s ease-in-out; pointer-events: none; }
+        .live-pet { position: absolute; font-size: 38px; z-index: 25; transition: all 2.5s ease-in-out; cursor: pointer; pointer-events: auto; }
 
         #pet-profile { position: fixed; right: -300px; top: 0; width: 280px; height: 100%; background: #0d140d; z-index: 3000; transition: 0.4s; padding: 25px; border-left: 4px solid #4cd964; }
         #pet-profile.open { right: 0; }
@@ -41,12 +47,22 @@
 </head>
 <body>
 
+    <div id="auth-screen">
+        <div class="auth-card">
+            <h2 style="color: #4cd964; margin-top:0;">GARDEN LOGIN</h2>
+            <input type="text" id="username" class="auth-input" placeholder="Никнейм">
+            <input type="password" id="password" class="auth-input" placeholder="Пароль">
+            <button class="btn btn-buy" onclick="login()">ИГРАТЬ</button>
+        </div>
+    </div>
+
     <div id="weather-overlay"></div>
 
     <div id="ui-top">
-        <div id="w-ui" style="background:rgba(0,0,0,0.5); padding:5px; border-radius:10px;">🌤️ Ясно</div>
+        <div id="w-ui">🌤️ Ясно</div>
         <div>💰 <span id="coins">500</span></div>
         <div>💧 <span id="water">25</span></div>
+        <div id="user-display" style="font-size: 10px; color:#4cd964"></div>
     </div>
 
     <div id="pet-profile">
@@ -65,7 +81,7 @@
         </div>
 
         <div class="section">
-            <strong>ИНВЕНТАРЬ (Петы: <span id="pet-count">0</span>/3)</strong>
+            <strong>ИНВЕНТАРЬ (<span id="pet-count">0</span>/3 пета)</strong>
             <div id="inv-items" class="inv-grid"></div>
         </div>
 
@@ -87,9 +103,12 @@
             <strong>РЫНОК</strong>
             <div id="sell-market" class="market-grid"></div>
         </div>
+        
+        <button class="btn" style="background: #333; color: white; margin-top: 20px;" onclick="logout()">ВЫЙТИ</button>
     </div>
 
 <script>
+    let currentUser = null;
     let coins = 500, water = 25, selectedIdx = null;
     let plots = Array(9).fill(null);
     let inventory = [], activePets = [], currentStock = [];
@@ -99,132 +118,172 @@
         { icon: '🥕', name: 'Морковь', price: 10, sell: 25, time: 10 },
         { icon: '🎃', name: 'Тыква', price: 30, sell: 85, time: 25 },
         { icon: '🌵', name: 'Кактус', price: 70, sell: 210, time: 50 },
-        { icon: '🌸', name: 'Candy', price: 400, sell: 1500, time: 100 }
+        { icon: '🌸', name: 'Candy', price: 400, sell: 1500, time: 100 },
+        { icon: '🌳', name: 'Яблоня', price: 500, sell: 350, time: 60, isPermanent: true } 
     ];
 
     const PETS = {
         '🐱': { name: 'Кот', desc: 'Дает +25💰 каждые 20с', effect: 'money' },
         '🦉': { name: 'Сова', desc: 'Дает +4💧 каждые 20с', effect: 'water' },
         '🦝': { name: 'Енот', desc: 'Крадет фрукты каждые 40с', effect: 'fruit' },
-        '🐝': { name: 'Стрекоза', desc: 'Золотая мутация урожая (х1.75)', effect: 'mutate' }
+        '🐝': { name: 'Стрекоза', desc: 'Золотая мутация (х1.75)', effect: 'mutate' }
     };
 
-    const WEATHER = [
+    const WEATHER_TYPES = [
         { name: 'Дождь', id: 'rain', mult: 1.2, color: 'rgba(0,100,255,0.15)', icon: '🌧️', mut: 'Сочный' },
         { name: 'Снег', id: 'snow', mult: 1.4, color: 'rgba(255,255,255,0.15)', icon: '❄️', mut: 'Ледяной' },
-        { name: 'Буря', id: 'sand', mult: 1.6, color: 'rgba(210,180,140,0.25)', icon: '🏜️', mut: 'Пустынный' },
         { name: 'Радиация', id: 'nuke', mult: 2.2, color: 'rgba(50,255,50,0.15)', icon: '☢️', mut: 'Мутант' },
         { name: 'Сияние', id: 'gold', mult: 3.0, color: 'rgba(255,215,0,0.2)', icon: '✨', mut: 'Святой' }
     ];
 
+    // --- СИСТЕМА АККАУНТОВ ---
+    function login() {
+        const u = document.getElementById('username').value.trim().toLowerCase();
+        const p = document.getElementById('password').value.trim();
+        if(!u || !p) return alert("Введите данные!");
+        
+        currentUser = u;
+        const saved = localStorage.getItem('garden_v2_' + u);
+        
+        if(saved) {
+            const data = JSON.parse(saved);
+            if(data.password !== p) return alert("Этот ник занят. Неверный пароль!");
+            coins = data.coins; 
+            water = data.water; 
+            inventory = data.inventory || []; 
+            plots = data.plots || Array(9).fill(null); 
+            activePets = data.activePets || [];
+        } else {
+            saveGame(p); 
+            alert("Создан новый аккаунт!");
+        }
+        
+        document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('user-display').innerText = currentUser;
+        initGame();
+    }
+
+    function saveGame(pass) {
+        if(!currentUser) return;
+        let currentPass = pass;
+        if(!currentPass) {
+            const saved = localStorage.getItem('garden_v2_' + currentUser);
+            if(saved) currentPass = JSON.parse(saved).password;
+        }
+
+        const data = { 
+            password: currentPass, coins, water, inventory, plots, 
+            activePets: activePets.map(p => ({ id: p.id, icon: p.icon, name: p.name, desc: p.desc, effect: p.effect }))
+        };
+        localStorage.setItem('garden_v2_' + currentUser, JSON.stringify(data));
+    }
+
+    function initGame() {
+        updateStock(); updateUI();
+        activePets.forEach(p => spawnPetSprite(p));
+        setInterval(() => saveGame(), 5000);
+        setInterval(updateWeather, 30000);
+    }
+
+    // --- ЛОГИКА ИГРЫ ---
     function updateWeather() {
-        currentWeather = (Math.random() < 0.25) ? WEATHER[Math.floor(Math.random()*WEATHER.length)] : { name: 'Ясно', id: 'clear', mult: 1, color: 'transparent', icon: '🌤️' };
+        currentWeather = (Math.random() < 0.3) ? WEATHER_TYPES[Math.floor(Math.random()*WEATHER_TYPES.length)] : { name: 'Ясно', id: 'clear', mult: 1, color: 'transparent', icon: '🌤️' };
         document.getElementById('w-ui').innerText = currentWeather.icon + ' ' + currentWeather.name;
         document.getElementById('weather-overlay').style.background = currentWeather.color;
     }
-    setInterval(updateWeather, 30000);
 
     function interactPlot(i) {
         const p = plots[i];
         const sel = inventory[selectedIdx];
+        const el = document.getElementById(`plot-${i}`);
 
-        // 1. Посадка (если грядка пуста и выбраны семена)
         if(!p && sel && sel.type === 'seed') {
-            let mut = (currentWeather.id !== 'clear' && Math.random() < 0.3) ? currentWeather : null;
+            let mut = (currentWeather.id !== 'clear' && Math.random() < 0.4) ? currentWeather : null;
             plots[i] = { ...sel, timeLeft: sel.time, stage: 0, watered: false, weatherMut: mut, isGolden: false };
-            inventory.splice(selectedIdx, 1);
-            selectedIdx = null; closeProfile(); updateUI();
+            inventory.splice(selectedIdx, 1); selectedIdx = null; updateUI();
         } 
-        // 2. Полив
         else if(p && !p.watered && water > 0 && p.stage < 2) {
             water--; p.watered = true; updateUI();
         } 
-        // 3. СБОР (БАГ ИСПРАВЛЕН ТУТ)
         else if(p && p.stage === 2) {
-            let price = p.sell;
-            if(p.weatherMut) price = Math.floor(price * p.weatherMut.mult);
-            if(p.isGolden) price = Math.floor(price * 1.75);
-
-            inventory.push({ 
-                icon: p.icon, 
-                type: 'fruit', 
-                sell: price, 
-                label: p.isGolden ? 'Золотой' : (p.weatherMut ? p.weatherMut.mut : '') 
-            });
-            
-            plots[i] = null; // ГАРАНТИРОВАННОЕ ОЧИЩЕНИЕ ДАННЫХ
-            const el = document.getElementById(`plot-${i}`);
-            el.innerHTML = ''; // ОЧИЩЕНИЕ ВИЗУАЛА
-            el.className = 'plot'; // СБРОС СТИЛЕЙ
-            
+            let pr = p.sell;
+            if(p.weatherMut) pr = Math.floor(pr * p.weatherMut.mult);
+            if(p.isGolden) pr = Math.floor(pr * 1.75);
+            inventory.push({ icon: (p.name === 'Яблоня' ? '🍎' : p.icon), type: 'fruit', sell: pr, label: p.isGolden ? 'Золотой' : (p.weatherMut ? p.weatherMut.mut : '') });
+            if (p.isPermanent) { p.timeLeft = p.time; p.stage = 0; p.watered = false; p.isGolden = false; p.weatherMut = null; } 
+            else { plots[i] = null; el.innerHTML = ''; el.className = 'plot'; }
             updateUI();
         }
     }
 
-    // Движок роста
     setInterval(() => {
+        if(!currentUser) return;
         plots.forEach((p, i) => {
             if(!p || p.stage >= 2) return;
             p.timeLeft -= (p.watered ? 2 : 1) / 10;
             if(p.timeLeft <= p.time * 0.5 && p.stage === 0) p.stage = 1;
             if(p.timeLeft <= 0) { p.timeLeft = 0; p.stage = 2; }
-            
-            // Отрисовка только если грядка не пуста
             const el = document.getElementById(`plot-${i}`);
             el.className = 'plot' + (p.watered ? ' watered' : '') + ((p.weatherMut || p.isGolden) ? ' mutated' : '');
-            let visual = p.stage === 0 ? '🌱' : (p.stage === 1 ? '🌿' : p.icon);
-            let timer = p.stage < 2 ? `<div class="grow-timer">${Math.ceil(p.timeLeft)}s</div>` : '';
-            let label = p.isGolden ? 'ЗОЛОТОЙ' : (p.weatherMut ? p.weatherMut.mut : '');
-            el.innerHTML = timer + visual + (label ? `<div class="mut-name">${label}</div>` : '');
+            let vis = p.stage === 0 ? '🌱' : (p.stage === 1 ? '🌿' : p.icon);
+            let lbl = p.isGolden ? 'ЗОЛОТОЙ' : (p.weatherMut ? p.weatherMut.mut : '');
+            el.innerHTML = (p.stage < 2 ? `<div class="grow-timer">${Math.ceil(p.timeLeft)}s</div>` : '') + vis + (lbl ? `<div class="mut-name">${lbl}</div>` : '');
         });
     }, 100);
 
+    function spawnPetSprite(pObj) {
+        const sprite = document.createElement('div');
+        sprite.className = 'live-pet'; sprite.id = 'p-' + pObj.id; sprite.innerText = pObj.icon;
+        sprite.onclick = (e) => { e.stopPropagation(); removePet(pObj.id); };
+        document.getElementById('garden-area').appendChild(sprite);
+        const move = () => { const s = document.getElementById('p-'+pObj.id); if(s){ s.style.left=Math.random()*80+'%'; s.style.top=Math.random()*70+'%'; }};
+        move(); pObj.timer = setInterval(move, 4000);
+        pObj.effTimer = setInterval(() => {
+            if(pObj.effect === 'money') coins += 25;
+            if(pObj.effect === 'water') water += 4;
+            if(pObj.effect === 'mutate') {
+                const r = plots.filter(pl => pl && pl.stage === 2 && !pl.isGolden);
+                if(r.length > 0) r[Math.floor(Math.random()*r.length)].isGolden = true;
+            }
+            updateUI();
+        }, 20000);
+    }
+
     function applyPet() {
-        if(activePets.length >= 3) return;
+        if(activePets.length >= 3) return alert("Максимум 3 пета!");
         const pet = inventory[selectedIdx];
         if(pet && pet.type === 'pet') {
-            const id = Date.now();
-            const sprite = document.createElement('div');
-            sprite.className = 'live-pet'; sprite.id = 'p-' + id; sprite.innerText = pet.icon;
-            document.getElementById('garden-area').appendChild(sprite);
-            activePets.push({ id, effect: pet.effect });
-            
-            const move = () => { const s = document.getElementById('p-'+id); if(s){ s.style.left=Math.random()*80+'%'; s.style.top=Math.random()*70+'%'; }};
-            move(); setInterval(move, 4000);
-            
-            setInterval(() => {
-                if(pet.effect === 'money') coins += 25;
-                if(pet.effect === 'water') water += 4;
-                if(pet.effect === 'fruit') inventory.push({icon:'🍎', type:'fruit', sell:45, label:'Украдено'});
-                if(pet.effect === 'mutate') {
-                    const ready = plots.filter(p => p && p.stage === 2 && !p.isGolden);
-                    if(ready.length > 0) ready[Math.floor(Math.random()*ready.length)].isGolden = true;
-                }
-                updateUI();
-            }, 25000);
-
+            const newPet = { ...pet, id: Date.now() };
+            activePets.push(newPet); spawnPetSprite(newPet);
             inventory.splice(selectedIdx, 1); selectedIdx = null; closeProfile(); updateUI();
         }
     }
+
+    function removePet(id) {
+        const idx = activePets.findIndex(p => p.id === id);
+        if(idx > -1) {
+            const p = activePets[idx];
+            clearInterval(p.timer); clearInterval(p.effTimer);
+            document.getElementById('p-' + id).remove();
+            inventory.push({ icon: p.icon, type: 'pet', name: p.name, desc: p.desc, effect: p.effect });
+            activePets.splice(idx, 1); updateUI();
+        }
+    }
+
+    function buyGear(t, c, a) { if(coins >= c) { coins -= c; if(t==='water') water += a; updateUI(); } }
 
     function updateUI() {
         document.getElementById('coins').innerText = coins;
         document.getElementById('water').innerText = water;
         document.getElementById('pet-count').innerText = activePets.length;
-        
         const grid = document.getElementById('inv-items'); grid.innerHTML = '';
         inventory.forEach((item, i) => {
             const slot = document.createElement('div');
             slot.className = 'inv-slot' + (selectedIdx === i ? ' selected' : '');
             slot.innerHTML = item.icon + (item.label ? '✨' : '');
-            slot.onclick = () => {
-                selectedIdx = i;
-                if(item.type === 'pet') openProfile(item);
-                else { closeProfile(); updateUI(); }
-            };
+            slot.onclick = () => { selectedIdx = i; if(item.type === 'pet') openProfile(item); else { closeProfile(); updateUI(); } };
             grid.appendChild(slot);
         });
-
         const sellBox = document.getElementById('sell-market'); sellBox.innerHTML = '';
         inventory.filter(it => it.type === 'fruit').forEach(it => {
             sellBox.innerHTML += `<div class="card">${it.icon} ${it.label || ''}<br>+${it.sell}💰<br><button class="btn btn-sell" onclick="sellOne(${inventory.indexOf(it)})">ПРОДАТЬ</button></div>`;
@@ -232,22 +291,9 @@
     }
 
     function sellOne(idx) { coins += inventory[idx].sell; inventory.splice(idx, 1); updateUI(); }
-    function buyGear(t, c, a) { if(coins >= c) { coins -= c; if(t==='water') water += a; updateUI(); } }
-    function openProfile(p) { 
-        document.getElementById('p-icon').innerText = p.icon; 
-        document.getElementById('p-name').innerText = p.name; 
-        document.getElementById('p-desc').innerText = p.desc;
-        document.getElementById('pet-profile').classList.add('open'); 
-    }
+    function openProfile(p) { document.getElementById('p-icon').innerText = p.icon; document.getElementById('p-name').innerText = p.name; document.getElementById('p-desc').innerText = p.desc; document.getElementById('pet-profile').classList.add('open'); }
     function closeProfile() { document.getElementById('pet-profile').classList.remove('open'); }
-    function buyEgg() {
-        if(coins >= 150) {
-            coins -= 150;
-            const k = Object.keys(PETS); const icon = k[Math.floor(Math.random()*k.length)];
-            inventory.push({ icon, type: 'pet', ...PETS[icon] }); updateUI();
-        }
-    }
-
+    function buyEgg() { if(coins >= 150) { coins -= 150; const k = Object.keys(PETS); const icon = k[Math.floor(Math.random()*k.length)]; inventory.push({ icon, type: 'pet', ...PETS[icon] }); updateUI(); } }
     function updateStock() {
         const d = document.getElementById('seed-stock-display'); d.innerHTML = ''; currentStock = [];
         for(let i=0; i<2; i++) {
@@ -256,11 +302,9 @@
         }
     }
     function buyFromStock(i) { const s = currentStock[i]; if(coins >= s.price) { coins -= s.price; inventory.push({...s, type:'seed'}); updateUI(); } }
-
+    function logout() { location.reload(); }
     let shopSec = 120;
-    setInterval(() => { shopSec--; document.getElementById('shop-timer').innerText = shopSec; if(shopSec <= 0) { shopSec = 120; updateStock(); } }, 1000);
-
-    updateStock(); updateUI();
+    setInterval(() => { if(!currentUser) return; shopSec--; document.getElementById('shop-timer').innerText = shopSec; if(shopSec <= 0) { shopSec = 120; updateStock(); } }, 1000);
 </script>
 </body>
 </html>
