@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CIGMA Garden: Shovel Update</title>
+    <title>CIGMA Garden: Shovel + Love Machine</title>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
         body { margin: 0; background: #0a0f0a; color: white; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
@@ -15,6 +15,11 @@
         #ui-top { width: 100%; padding: 10px; display: flex; justify-content: space-around; align-items: center; font-weight: bold; background: #152015; border-bottom: 3px solid #4cd964; position: sticky; top: 0; z-index: 2000; }
         #weather-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1500; transition: 1s; }
         .container { width: 100%; max-width: 500px; margin: auto; padding: 10px; height: 92vh; overflow-y: auto; }
+
+        /* МАШИНА ЛЮБВИ СТИЛЬ */
+        #love-machine { background: linear-gradient(135deg, #440a16, #22050b); border: 2px solid #ff4d6d; border-radius: 18px; padding: 15px; margin-bottom: 15px; text-align: center; box-shadow: 0 0 15px rgba(255, 77, 109, 0.3); }
+        .recipe-item { display: inline-block; width: 40px; height: 40px; line-height: 40px; background: rgba(0,0,0,0.3); border-radius: 8px; margin: 5px; font-size: 20px; border: 1px solid #555; cursor: pointer; }
+        .recipe-item.ready { border-color: #ff4d6d; background: rgba(255, 77, 109, 0.2); }
 
         #garden-area { position: relative; width: 100%; background: #2b1d10; border-radius: 20px; border: 4px solid #3e2723; padding: 15px; min-height: 380px; }
         #garden-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; position: relative; z-index: 10; }
@@ -71,6 +76,12 @@
     </div>
 
     <div class="container">
+        <div id="love-machine">
+            <strong style="color:#ff4d6d">💖 LOVE MACHINE</strong><br>
+            <div id="recipe-display" style="margin: 10px 0;"></div>
+            <button id="craft-btn" class="btn" style="display:none; background:#ff4d6d; color:white;" onclick="startCraft()">КРАФТ LOVE SEED (60с)</button>
+        </div>
+
         <div id="garden-area">
             <div id="garden-grid">
                 <script>for(let i=0; i<9; i++) document.write(`<div class="plot" id="plot-${i}" onclick="interactPlot(${i})"></div>`);</script>
@@ -110,6 +121,9 @@
     let plots = Array(9).fill(null);
     let inventory = [], activePets = [], currentStock = [];
     let currentWeather = { name: 'Ясно', id: 'clear', mult: 1, color: 'transparent', icon: '🌤️' };
+    
+    // Новое для машины
+    let currentRecipe = [], recipeProgress = [];
 
     const SEEDS = [
         { icon: '🥕', name: 'Морковь', price: 10, sell: 25, time: 10 },
@@ -159,10 +173,56 @@
     }
 
     function initGame() {
-        updateStock(); updateUI();
+        updateStock(); updateUI(); generateRecipe();
         activePets.forEach(p => spawnPetSprite(p));
         setInterval(() => saveGame(), 5000);
         setInterval(() => { if(currentUser) updateWeather(); }, 30000);
+    }
+
+    // ЛОГИКА МАШИНЫ ЛЮБВИ
+    function generateRecipe() {
+        const pool = ['🥕', '🎃', '🍎'];
+        currentRecipe = Array(3).fill(0).map(() => pool[Math.floor(Math.random()*pool.length)]);
+        recipeProgress = [false, false, false];
+        renderRecipe();
+    }
+
+    function renderRecipe() {
+        const d = document.getElementById('recipe-display'); d.innerHTML = '';
+        currentRecipe.forEach((icon, i) => {
+            d.innerHTML += `<div class="recipe-item ${recipeProgress[i]?'ready':''}" onclick="fillRecipe(${i})">${icon}</div>`;
+        });
+        document.getElementById('craft-btn').style.display = recipeProgress.every(v=>v) ? 'block' : 'none';
+    }
+
+    function fillRecipe(idx) {
+        if(recipeProgress[idx]) return;
+        const iconNeeded = currentRecipe[idx];
+        const invIdx = inventory.findIndex(it => it.icon === iconNeeded && it.type === 'fruit');
+        if(invIdx > -1) {
+            inventory.splice(invIdx, 1);
+            recipeProgress[idx] = true;
+            renderRecipe();
+            updateUI();
+        } else { alert("Нужен этот предмет в инвентаре!"); }
+    }
+
+    function startCraft() {
+        const btn = document.getElementById('craft-btn');
+        btn.disabled = true;
+        let time = 60;
+        const itv = setInterval(() => {
+            time--; btn.innerText = `ЖДЕМ... ${time}с`;
+            if(time <= 0) {
+                clearInterval(itv);
+                inventory.push({ icon: '💖', name: 'Love Seed', type: 'seed', time: 40, sell: 1200 });
+                generateRecipe();
+                btn.disabled = false;
+                btn.innerText = "КРАФТ LOVE SEED (60с)";
+                updateUI();
+                alert("Love Seed создан!");
+            }
+        }, 1000);
     }
 
     function updateWeather() {
@@ -176,15 +236,8 @@
         const sel = inventory[selectedIdx];
         const el = document.getElementById(`plot-${i}`);
 
-        // Использование лопаты
         if (sel && sel.type === 'tool' && sel.name === 'Лопата') {
-            if (p) {
-                plots[i] = null;
-                el.innerHTML = '';
-                el.className = 'plot';
-                updateUI();
-                return;
-            }
+            if (p) { plots[i] = null; el.innerHTML = ''; el.className = 'plot'; updateUI(); return; }
         }
 
         if(!p && sel && sel.type === 'seed') {
@@ -287,11 +340,8 @@
             if(t === 'shovel') {
                 if(inventory.find(it => it.name === 'Лопата')) return alert("Лопата уже есть!");
                 inventory.push({ icon: '🧹', type: 'tool', name: 'Лопата' });
-            } else if(t==='water') {
-                water += a;
-            }
-            coins -= c; 
-            updateUI(); 
+            } else if(t==='water') { water += a; }
+            coins -= c; updateUI(); 
         } 
     }
 
