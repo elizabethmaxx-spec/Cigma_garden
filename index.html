@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CIGMA Garden: Love Machine Update</title>
     <style>
-        /* СОХРАНЯЕМ ВСЕ ТВОИ СТИЛИ */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
         body { margin: 0; background: #0a0f0a; color: white; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
         
@@ -17,7 +16,6 @@
         #weather-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1500; transition: 1s; }
         .container { width: 100%; max-width: 500px; margin: auto; padding: 10px; height: 92vh; overflow-y: auto; }
 
-        /* СТИЛИ МАШИНЫ */
         #love-machine { background: linear-gradient(135deg, #440a16, #22050b); border: 2px solid #ff4d6d; border-radius: 18px; padding: 15px; margin-bottom: 15px; text-align: center; box-shadow: 0 0 15px rgba(255, 77, 109, 0.3); }
         .recipe-item { display: inline-block; width: 45px; height: 45px; line-height: 45px; background: rgba(0,0,0,0.4); border-radius: 10px; margin: 5px; font-size: 24px; border: 2px solid #555; cursor: pointer; transition: 0.3s; }
         .recipe-item.ready { border-color: #ff4d6d; background: rgba(255, 77, 109, 0.2); box-shadow: 0 0 10px #ff4d6d; }
@@ -162,7 +160,6 @@
     let friends = [], notifications = [];
     let currentWeather = { name: 'Ясно', id: 'clear', mult: 1, color: 'transparent', icon: '🌤️' };
 
-    // МАШИНА: Рецепты
     let recipe = ['🥕', '🍎', '🎃'];
     let recipeStatus = [false, false, false];
 
@@ -188,7 +185,6 @@
         { name: 'Сияние', id: 'gold', mult: 3.0, color: 'rgba(255,215,0,0.2)', icon: '✨', mut: 'Святой' }
     ];
 
-    // --- ЛОГИКА МАШИНЫ ---
     function updateRecipeUI() {
         const d = document.getElementById('recipe-display');
         d.innerHTML = '';
@@ -230,7 +226,6 @@
         }, 1000);
     }
 
-    // --- ОСТАЛЬНАЯ ЛОГИКА (БЕЗ ИЗМЕНЕНИЙ) ---
     function login() {
         const u = document.getElementById('username').value.trim().toLowerCase();
         const p = document.getElementById('password').value.trim();
@@ -266,8 +261,14 @@
         setInterval(() => saveGame(), 5000);
         setInterval(() => { if(currentUser) updateWeather(); }, 30000);
         setInterval(() => {
-            const data = JSON.parse(localStorage.getItem('garden_v2_' + currentUser));
-            if(data && data.notifications.length !== notifications.length) { notifications = data.notifications; updateUI(); }
+            const dataRaw = localStorage.getItem('garden_v2_' + currentUser);
+            if(dataRaw) {
+                const data = JSON.parse(dataRaw);
+                if(data.notifications.length !== notifications.length) { 
+                    notifications = data.notifications; 
+                    updateUI(); 
+                }
+            }
         }, 3000);
     }
 
@@ -275,11 +276,9 @@
         const p = plots[i];
         const sel = inventory[selectedIdx];
         const el = document.getElementById(`plot-${i}`);
-
         if (sel && sel.type === 'tool' && sel.name === 'Лопата') {
             if (p) { plots[i] = null; el.innerHTML = ''; el.className = 'plot'; updateUI(); return; }
         }
-
         if(!p && sel && sel.type === 'seed') {
             let mut = (currentWeather.id !== 'clear' && Math.random() < 0.4) ? currentWeather : null;
             plots[i] = { ...sel, timeLeft: sel.time, stage: 0, watered: false, weatherMut: mut, isGolden: false };
@@ -376,7 +375,8 @@
 
         const fl = document.getElementById('friends-list'); fl.innerHTML = '';
         friends.forEach(f => {
-            const d = JSON.parse(localStorage.getItem('garden_v2_' + f));
+            const dRaw = localStorage.getItem('garden_v2_' + f);
+            const d = dRaw ? JSON.parse(dRaw) : null;
             fl.innerHTML += `<div class="friend-item">👤 ${f} <span style="color:#ffeb3b; font-size:12px;">${d ? d.coins : '???'}💰</span></div>`;
         });
 
@@ -386,28 +386,44 @@
         });
     }
 
-    // Социальные функции
+    // --- ИСПРАВЛЕННЫЕ СОЦИАЛЬНЫЕ ФУНКЦИИ ---
     function sendRequest() {
-        const target = document.getElementById('friend-name').value.trim().toLowerCase();
-        if(!target || target === currentUser) return;
-        const targetData = localStorage.getItem('garden_v2_' + target);
-        if(!targetData) return alert("Не найден!");
-        let tObj = JSON.parse(targetData);
-        if(!tObj.notifications) tObj.notifications = [];
+        const input = document.getElementById('friend-name');
+        const target = input.value.trim().toLowerCase();
+        if (!target) return alert("Введите ник!");
+        if (target === currentUser) return alert("Нельзя добавить себя!");
+        if (friends.includes(target)) return alert("Уже в друзьях!");
+
+        const targetDataRaw = localStorage.getItem('garden_v2_' + target);
+        if (!targetDataRaw) return alert("Пользователь не найден в этом браузере!");
+
+        let tObj = JSON.parse(targetDataRaw);
+        if (!tObj.notifications) tObj.notifications = [];
+        if (tObj.notifications.some(n => n.from === currentUser)) return alert("Запрос уже висит!");
+
         tObj.notifications.push({ from: currentUser, id: Date.now() });
         localStorage.setItem('garden_v2_' + target, JSON.stringify(tObj));
-        alert("Запрос отправлен!");
+        input.value = '';
+        alert("Запрос отправлен " + target + "!");
     }
+
     function acceptFriend(id, fromUser) {
-        friends.push(fromUser);
+        if (!friends.includes(fromUser)) friends.push(fromUser);
         notifications = notifications.filter(n => n.id !== id);
-        const fData = JSON.parse(localStorage.getItem('garden_v2_' + fromUser));
-        if(!fData.friends) fData.friends = [];
-        fData.friends.push(currentUser);
-        localStorage.setItem('garden_v2_' + fromUser, JSON.stringify(fData));
+
+        const senderDataRaw = localStorage.getItem('garden_v2_' + fromUser);
+        if (senderDataRaw) {
+            let sObj = JSON.parse(senderDataRaw);
+            if (!sObj.friends) sObj.friends = [];
+            if (!sObj.friends.includes(currentUser)) sObj.friends.push(currentUser);
+            localStorage.setItem('garden_v2_' + fromUser, JSON.stringify(sObj));
+        }
         saveGame(); updateUI(); closeModal('modal-notif');
     }
+
     function openNotifs() {
+        const myDataRaw = localStorage.getItem('garden_v2_' + currentUser);
+        if(myDataRaw) notifications = JSON.parse(myDataRaw).notifications || [];
         const list = document.getElementById('notif-list');
         list.innerHTML = notifications.length ? '' : 'Пусто';
         notifications.forEach(n => {
@@ -415,6 +431,7 @@
         });
         document.getElementById('modal-notif').classList.add('open');
     }
+
     function openUserProfile() {
         document.getElementById('prof-nick').innerText = currentUser.toUpperCase();
         document.getElementById('prof-coins').innerText = coins;
